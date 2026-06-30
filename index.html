@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Right-Eye Center Cropped VR Looper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Left side is completely blank */
+    .left-eye {
+      flex: 1;
+      background-color: #000;
+      border-right: 1px solid #222;
+    }
+
+    /* Right side holds the content */
+    .right-eye {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* The wrapper that tightly hugs the raw image */
+    .scene-container {
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      display: inline-block;
+    }
+
+    /* The raw scene dictates the size of the container */
+    #img-raw {
+      display: block;
+      max-width: 100%;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    /* Overlay images (Detection and Center-Crops) */
+    .overlay-img {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%); /* Keeps them perfectly centered */
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    /* Active class toggles visibility */
+    .active {
+      opacity: 1 !important;
+    }
+
+    /* Controls UI */
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      gap: 15px;
+    }
+
+    button {
+      background: #444;
+      color: white;
+      border: 1px solid #666;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="controls">
+    <button id="fullscreen-btn">Fullscreen</button>
+  </div>
+
+  <div class="left-eye"></div>
+
+  <div class="right-eye">
+    <div class="scene-container">
+      <img id="img-raw" src="image.png" class="seq-img active" alt="Raw Scene">
+      
+      <img id="overlay-detect" src="overlay_0152.png" class="seq-img overlay-img" alt="Detection">
+      <img id="overlay-crop" src="PhotoshopExtension_Image.png" class="seq-img overlay-img" alt="Cropped Canvas">
+      <img id="overlay-pixel" src="Screenshot 2026-06-28 000402.png" class="seq-img overlay-img" alt="Pixelated View">
+      <img id="overlay-heatmap" src="WhatsApp Image 2026-06-28 at 3.29.28 AM.jpeg" class="seq-img overlay-img" alt="Heatmap View">
+    </div>
+  </div>
+
+  <script>
+    const sequence = document.querySelectorAll('.seq-img');
+    const rawImage = document.getElementById('img-raw');
+    
+    // Grab the overlays individually so we can control them specifically
+    const overlayDetect = document.getElementById('overlay-detect');
+    const overlayCrop = document.getElementById('overlay-crop');
+    const overlayPixel = document.getElementById('overlay-pixel');
+    const overlayHeatmap = document.getElementById('overlay-heatmap'); // Select the new image
+    
+    let currentIndex = 0;
+    const loopSpeedMs = 1200; // Change image every 1.2s
+
+    // 1. Precise Auto-Scaling Logic
+    function syncScales() {
+      // Find out how much the raw image has shrunk to fit the user's screen
+      const scaleFactor = rawImage.clientWidth / rawImage.naturalWidth;
+      
+      // 1st Overlay: Scale the detection image normally
+      if(overlayDetect.naturalWidth > 0) {
+        overlayDetect.style.width = (overlayDetect.naturalWidth * scaleFactor) + 'px';
+        overlayDetect.style.height = (overlayDetect.naturalHeight * scaleFactor) + 'px';
+      }
+
+      // 2nd Overlay: Calculate the scaled size for the cropped canvas
+      if(overlayCrop.naturalWidth > 0) {
+        const cropWidth = (overlayCrop.naturalWidth * scaleFactor) + 'px';
+        const cropHeight = (overlayCrop.naturalHeight * scaleFactor) + 'px';
+        
+        overlayCrop.style.width = cropWidth;
+        overlayCrop.style.height = cropHeight;
+
+        // 3rd Overlay: FORCE the pixelated view to match the exact dimensions of the cropped canvas
+        overlayPixel.style.width = cropWidth;
+        overlayPixel.style.height = cropHeight;
+
+        // 4th Overlay: FORCE the heatmap view to match the exact dimensions as well
+        overlayHeatmap.style.width = cropWidth;
+        overlayHeatmap.style.height = cropHeight;
+      }
+    }
+
+    // Run the scaling function when images load, and whenever the window resizes
+    window.addEventListener('load', syncScales);
+    window.addEventListener('resize', syncScales);
+    
+    // Extra safeguard for cached image loads
+    rawImage.onload = syncScales;
+    overlayDetect.onload = syncScales;
+    overlayCrop.onload = syncScales;
+    overlayPixel.onload = syncScales;
+    overlayHeatmap.onload = syncScales; // Add safeguard for new image
+
+    // 2. Looping Logic
+    function nextFrame() {
+      // Remove active class from all
+      sequence.forEach(img => img.classList.remove('active'));
+      
+      // Move to next index and add active
+      currentIndex = (currentIndex + 1) % sequence.length;
+      sequence[currentIndex].classList.add('active');
+    }
+
+    setInterval(nextFrame, loopSpeedMs);
+
+    // 3. Fullscreen Logic
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+        fullscreenBtn.textContent = 'Exit Fullscreen';
+      } else {
+        document.exitFullscreen();
+        fullscreenBtn.textContent = 'Fullscreen';
+      }
+    });
+  </script>
+</body>
+</html>
