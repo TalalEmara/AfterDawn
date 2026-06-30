@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Right-Eye Center Cropped VR Looper</title>
+  <title>Dynamic Stereoscopic VR Looper</title>
   <style>
     * {
       box-sizing: border-box;
@@ -21,20 +21,18 @@
       display: flex;
     }
 
-    /* Left side is completely blank */
-    .left-eye {
-      flex: 1;
-      background-color: #000;
-      border-right: 1px solid #222;
-    }
-
-    /* Right side holds the content */
-    .right-eye {
+    /* Both eyes need the same centering logic now */
+    .left-eye, .right-eye {
       flex: 1;
       display: flex;
       justify-content: center;
       align-items: center;
       position: relative;
+    }
+
+    .left-eye {
+      background-color: #000;
+      border-right: 1px solid #222;
     }
 
     /* The wrapper that tightly hugs the raw image */
@@ -45,8 +43,8 @@
       display: inline-block;
     }
 
-    /* The raw scene dictates the size of the container */
-    #img-raw {
+    /* The raw scene dictates the size of the container (Changed to a class so it applies to both eyes) */
+    .img-raw {
       display: block;
       max-width: 100%;
       max-height: 100vh;
@@ -103,80 +101,104 @@
     <button id="fullscreen-btn">Fullscreen</button>
   </div>
 
-  <div class="left-eye"></div>
+  <div class="left-eye">
+    <div class="scene-container">
+      <img id="img-raw-left" src="image.png" class="left-img img-raw active" alt="Raw Scene Left">
+      <img id="overlay-detect-left" src="overlay_0152.png" class="left-img overlay-img" alt="Detection Left">
+    </div>
+  </div>
 
   <div class="right-eye">
     <div class="scene-container">
-      <img id="img-raw" src="image.png" class="seq-img active" alt="Raw Scene">
+      <img id="img-raw-right" src="image.png" class="right-img img-raw active" alt="Raw Scene Right">
       
-      <img id="overlay-detect" src="overlay_0152.png" class="seq-img overlay-img" alt="Detection">
-      <img id="overlay-crop" src="PhotoshopExtension_Image.png" class="seq-img overlay-img" alt="Cropped Canvas">
-      <img id="overlay-pixel" src="Screenshot 2026-06-28 000402.png" class="seq-img overlay-img" alt="Pixelated View">
-      <img id="overlay-heatmap" src="WhatsApp Image 2026-06-28 at 3.29.28 AM.jpeg" class="seq-img overlay-img" alt="Heatmap View">
+      <img id="overlay-detect" src="overlay_0152.png" class="right-img overlay-img" alt="Detection">
+      <img id="overlay-crop" src="PhotoshopExtension_Image.png" class="right-img overlay-img" alt="Cropped Canvas">
+      <img id="overlay-pixel" src="Screenshot 2026-06-28 000402.png" class="right-img overlay-img" alt="Pixelated View">
+      <img id="overlay-heatmap" src="WhatsApp Image 2026-06-28 at 3.29.28 AM.jpeg" class="right-img overlay-img" alt="Heatmap View">
     </div>
   </div>
 
   <script>
-    const sequence = document.querySelectorAll('.seq-img');
-    const rawImage = document.getElementById('img-raw');
+    // Group images by eye
+    const leftImages = document.querySelectorAll('.left-img');
+    const rightImages = document.querySelectorAll('.right-img');
     
-    // Grab the overlays individually so we can control them specifically
+    // Right Eye Elements
+    const rawRight = document.getElementById('img-raw-right');
     const overlayDetect = document.getElementById('overlay-detect');
     const overlayCrop = document.getElementById('overlay-crop');
     const overlayPixel = document.getElementById('overlay-pixel');
-    const overlayHeatmap = document.getElementById('overlay-heatmap'); // Select the new image
+    const overlayHeatmap = document.getElementById('overlay-heatmap'); 
+
+    // Left Eye Elements
+    const rawLeft = document.getElementById('img-raw-left');
+    const detectLeft = document.getElementById('overlay-detect-left');
     
     let currentIndex = 0;
     const loopSpeedMs = 1200; // Change image every 1.2s
 
-    // 1. Precise Auto-Scaling Logic
+    // 1. Precise Auto-Scaling Logic for BOTH eyes
     function syncScales() {
-      // Find out how much the raw image has shrunk to fit the user's screen
-      const scaleFactor = rawImage.clientWidth / rawImage.naturalWidth;
+      // --- SCALE RIGHT EYE ---
+      const scaleRight = rawRight.clientWidth / rawRight.naturalWidth;
       
-      // 1st Overlay: Scale the detection image normally
       if(overlayDetect.naturalWidth > 0) {
-        overlayDetect.style.width = (overlayDetect.naturalWidth * scaleFactor) + 'px';
-        overlayDetect.style.height = (overlayDetect.naturalHeight * scaleFactor) + 'px';
+        overlayDetect.style.width = (overlayDetect.naturalWidth * scaleRight) + 'px';
+        overlayDetect.style.height = (overlayDetect.naturalHeight * scaleRight) + 'px';
       }
 
-      // 2nd Overlay: Calculate the scaled size for the cropped canvas
       if(overlayCrop.naturalWidth > 0) {
-        const cropWidth = (overlayCrop.naturalWidth * scaleFactor) + 'px';
-        const cropHeight = (overlayCrop.naturalHeight * scaleFactor) + 'px';
+        const cropWidth = (overlayCrop.naturalWidth * scaleRight) + 'px';
+        const cropHeight = (overlayCrop.naturalHeight * scaleRight) + 'px';
         
         overlayCrop.style.width = cropWidth;
         overlayCrop.style.height = cropHeight;
-
-        // 3rd Overlay: FORCE the pixelated view to match the exact dimensions of the cropped canvas
         overlayPixel.style.width = cropWidth;
         overlayPixel.style.height = cropHeight;
-
-        // 4th Overlay: FORCE the heatmap view to match the exact dimensions as well
         overlayHeatmap.style.width = cropWidth;
         overlayHeatmap.style.height = cropHeight;
       }
+
+      // --- SCALE LEFT EYE ---
+      const scaleLeft = rawLeft.clientWidth / rawLeft.naturalWidth;
+      
+      if(detectLeft.naturalWidth > 0) {
+        detectLeft.style.width = (detectLeft.naturalWidth * scaleLeft) + 'px';
+        detectLeft.style.height = (detectLeft.naturalHeight * scaleLeft) + 'px';
+      }
     }
 
-    // Run the scaling function when images load, and whenever the window resizes
+    // Run scaling on load and resize
     window.addEventListener('load', syncScales);
     window.addEventListener('resize', syncScales);
     
-    // Extra safeguard for cached image loads
-    rawImage.onload = syncScales;
+    // Extra safeguards for cached image loads
+    rawRight.onload = syncScales;
     overlayDetect.onload = syncScales;
     overlayCrop.onload = syncScales;
     overlayPixel.onload = syncScales;
-    overlayHeatmap.onload = syncScales; // Add safeguard for new image
+    overlayHeatmap.onload = syncScales;
+    rawLeft.onload = syncScales;
+    detectLeft.onload = syncScales;
 
-    // 2. Looping Logic
+    // 2. Stereoscopic Looping Logic
     function nextFrame() {
-      // Remove active class from all
-      sequence.forEach(img => img.classList.remove('active'));
+      // Remove active class from all images in both eyes
+      leftImages.forEach(img => img.classList.remove('active'));
+      rightImages.forEach(img => img.classList.remove('active'));
       
-      // Move to next index and add active
-      currentIndex = (currentIndex + 1) % sequence.length;
-      sequence[currentIndex].classList.add('active');
+      // Move to next index (Dictated by the right eye's 5 images)
+      currentIndex = (currentIndex + 1) % rightImages.length;
+      
+      // Right eye ALWAYS gets the active class for the current index
+      rightImages[currentIndex].classList.add('active');
+
+      // Left eye ONLY gets the active class if we are on the first two images (Index 0 or 1)
+      // Otherwise, nothing gets an active class and the left eye naturally shows black
+      if (currentIndex === 0 || currentIndex === 1) {
+        leftImages[currentIndex].classList.add('active');
+      }
     }
 
     setInterval(nextFrame, loopSpeedMs);
